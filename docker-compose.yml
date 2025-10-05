@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  ai-ngfw:
+    build: .
+    container_name: ai-ngfw-core
+    ports:
+      - "8000:8000"
+      - "8050:8050"
+      - "9090:9090"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ./data:/app/data
+    depends_on:
+      - mongodb
+      - redis
+      - elasticsearch
+    networks:
+      - ai-ngfw-network
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7.0
+    container_name: ai-ngfw-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - ai-ngfw-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-ngfw-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ai-ngfw-network
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: ai-ngfw-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - ai-ngfw-network
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: ai-ngfw-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    networks:
+      - ai-ngfw-network
+    restart: unless-stopped
+
+volumes:
+  mongodb-data:
+  redis-data:
+  elasticsearch-data:
+
+networks:
+  ai-ngfw-network:
+    driver: bridge
